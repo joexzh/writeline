@@ -10,10 +10,10 @@ import (
 	"time"
 )
 
-const errPrefix = "lineWriter: "
+const errPrefix = "LineWriter: "
 
-// lineWriter maintains <n> new lines. Each line can be overwritten.
-type lineWriter struct {
+// LineWriter maintains <n> new lines. Each line can be overwritten. Zero value is not ready for use.
+type LineWriter struct {
 	stop     chan struct{}
 	lines    int
 	currLine int // from top to down, begin at zero
@@ -22,10 +22,10 @@ type lineWriter struct {
 	mu       sync.Mutex
 }
 
-// New creates a *lineWriter for io.Writer, inits and maintains n lines. Also starts a flush timer with default duration 200*time.Millisecond
+// New creates a *LineWriter for io.Writer, inits and maintains n lines. Also starts a flush timer with default duration 200*time.Millisecond
 // 	Note: This is a buffer method.
-func New(lines int, w io.Writer) (*lineWriter, error) {
-	wl := &lineWriter{
+func New(lines int, w io.Writer) (*LineWriter, error) {
+	wl := &LineWriter{
 		wr:       bufio.NewWriter(w),
 		lines:    lines,
 		stop:     make(chan struct{}),
@@ -40,13 +40,13 @@ func New(lines int, w io.Writer) (*lineWriter, error) {
 	return wl, nil
 }
 
-// NewWithStdout creates a *lineWriter for os.Stdout, inits and maintains n lines. Also starts a flush timer with default duration 200*time.Millisecond
+// NewWithStdout creates a *LineWriter for os.Stdout, inits and maintains n lines. Also starts a flush timer with default duration 200*time.Millisecond
 // 	Note: This is a buffer method.
-func NewWithStdout(lines int) (*lineWriter, error) {
+func NewWithStdout(lines int) (*LineWriter, error) {
 	return New(lines, os.Stdout)
 }
 
-func (w *lineWriter) SetFlushDuration(d time.Duration) {
+func (w *LineWriter) SetFlushDuration(d time.Duration) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -57,14 +57,14 @@ func (w *lineWriter) SetFlushDuration(d time.Duration) {
 
 // NewLine Move cursor to new line at the bottom.
 // 	Note: This is a buffer method.
-func (w *lineWriter) NewLine(s string) *lineWriter {
+func (w *LineWriter) NewLine(s string) *LineWriter {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	if err := w.moveCursorToLine(w.lines - 1); err != nil {
 		return w
 	}
-	_, err := w.wr.WriteString("\n\r")
+	_, err := w.wr.WriteString("\n\r" + s)
 	if err != nil {
 		return w
 	}
@@ -76,7 +76,7 @@ func (w *lineWriter) NewLine(s string) *lineWriter {
 // WriteLastLine overwrites the last line.
 // 	Any position control string will lead to unexpected behavior. Such as \n, \033[K ...
 // 	Note: This is a buffer method.
-func (w *lineWriter) WriteLastLine(s string) *lineWriter {
+func (w *LineWriter) WriteLastLine(s string) *LineWriter {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -87,7 +87,7 @@ func (w *lineWriter) WriteLastLine(s string) *lineWriter {
 // WriteLine overwrites the nth line.
 // 	Any position control string will lead to unexpected behavior. Such as \n, \033[K...
 // 	Note: This is a buffer method.
-func (w *lineWriter) WriteLine(n int, s string) *lineWriter {
+func (w *LineWriter) WriteLine(n int, s string) *LineWriter {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -96,12 +96,12 @@ func (w *lineWriter) WriteLine(n int, s string) *lineWriter {
 }
 
 // Lines return total maintained lines
-func (w *lineWriter) Lines() int {
+func (w *LineWriter) Lines() int {
 	return w.lines
 }
 
 // Flush all buffered string to the underlying io.Writer
-func (w *lineWriter) Flush() *lineWriter {
+func (w *LineWriter) Flush() *LineWriter {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.wr.Flush()
@@ -109,7 +109,7 @@ func (w *lineWriter) Flush() *lineWriter {
 }
 
 // Close end with a newline, stop timer, flush all remaining buffered string
-func (w *lineWriter) Close() {
+func (w *LineWriter) Close() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	defer w.wr.Flush()
@@ -125,7 +125,7 @@ func (w *lineWriter) Close() {
 	return
 }
 
-func (w *lineWriter) startTimer() {
+func (w *LineWriter) startTimer() {
 	for {
 		select {
 		case <-time.After(w.duration):
@@ -137,7 +137,7 @@ func (w *lineWriter) startTimer() {
 	}
 }
 
-func (w *lineWriter) moveCursorToLine(n int) error {
+func (w *LineWriter) moveCursorToLine(n int) error {
 	switch {
 	case n > w.lines-1:
 		return errors.New(errPrefix + "out of line range")
@@ -151,7 +151,7 @@ func (w *lineWriter) moveCursorToLine(n int) error {
 	return nil
 }
 
-func (w *lineWriter) initLines() error {
+func (w *LineWriter) initLines() error {
 	for i := 0; i < w.lines-1; i++ {
 		_, err := w.wr.WriteString("\n")
 		if err != nil {
@@ -162,12 +162,12 @@ func (w *lineWriter) initLines() error {
 	return nil
 }
 
-func (w *lineWriter) cursorReturn() error {
+func (w *LineWriter) cursorReturn() error {
 	_, err := w.wr.WriteString(carriageReturn)
 	return err
 }
 
-func (w *lineWriter) moveUpLines(n int) error {
+func (w *LineWriter) moveUpLines(n int) error {
 	_, err := w.wr.WriteString(fmt.Sprintf(moveUpLines, n))
 	if err != nil {
 		return err
@@ -176,7 +176,7 @@ func (w *lineWriter) moveUpLines(n int) error {
 	return nil
 }
 
-func (w *lineWriter) moveDownLines(n int) error {
+func (w *LineWriter) moveDownLines(n int) error {
 	_, err := w.wr.WriteString(fmt.Sprintf(moveDownLines, n))
 	if err != nil {
 		return err
@@ -185,12 +185,12 @@ func (w *lineWriter) moveDownLines(n int) error {
 	return nil
 }
 
-func (w *lineWriter) eraseLine() (err error) {
+func (w *LineWriter) eraseLine() (err error) {
 	_, err = w.wr.WriteString(carriageReturn + eraseToEnd)
 	return
 }
 
-func (w *lineWriter) writeLine(n int, s string) error {
+func (w *LineWriter) writeLine(n int, s string) error {
 	if err := w.moveCursorToLine(n); err != nil {
 		return errFunc(err)
 	}
