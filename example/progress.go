@@ -26,7 +26,8 @@ func main() {
 		for i := 0; i < 100; i++ {
 
 			lw.WriteLine(0, fmt.Sprintf("%v, %vth loop", names[0], i))
-			lw.WriteLine(0+1, fmt.Sprintf("%v...%v/%v", names[0], i+1, 100)).Flush()
+			lw.WriteLine(0+1, fmt.Sprintf("%v...%v/%v", names[0], i+1, 100))
+			lw.Flush()
 			time.Sleep(100 * time.Millisecond)
 		}
 		lw.WriteLine(0, fmt.Sprintf("%v done", names[0]))
@@ -46,6 +47,8 @@ func main() {
 	}()
 
 	wg.Wait()
+	lw.WriteLastLine("dog 100%")
+	lw.WriteNewLine("all done")
 	lw.Close()
 	fmt.Print(lw.Lines())
 }

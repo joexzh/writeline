@@ -7,31 +7,29 @@ It maintains new lines and overwrites to them.
 ```go
 // new writeline creates and maintains 10 new lines.
 // It holds a default flush timer with 200 milliseconds duration   
-wl, err := NewWithStdout(10)
+lw, err := NewWithStdout(10)
 
 // reset the flush timer duration
-wl.SetFlushDuration(100 * time.Millisecond)
+lw.SetFlushDuration(100 * time.Millisecond)
 
 // Flush all changes immediately
-wl.Flush()
+lw.Flush()
 
 // overwrite line 0
-wl.WriteLine(0, "Hello world")
+lw.WriteLine(0, "Hello world")
 
-// overwrite line 9 and flush all changes immediately
-wl.WriteLine(9, "Hello world").Flush()
+// overwrite line 9
+lw.WriteLine(9, "Hello world")
+lw.Flush()
 
 // overwrite the last line
-wl.WriteLastLine("hi")
+lineNum, err := lw.WriteLastLine("hi")
 
 // create a new line at the bottom and write to it
-wl.NewLine("foo")
-
-// overwrite the line just created
-wl.WriteLastLine(10, "bar")
+newLineNum, err := lw.WriteNewLine("foo")
 
 // total maintained lines
-wl.Lines() // 11
+lw.Lines() // 11
 
 // close writeline
 wl.Close()
