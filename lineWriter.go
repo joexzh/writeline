@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"github.com/mattn/go-isatty"
 	"io"
 	"os"
 	"sync"
@@ -48,7 +49,7 @@ func New(lines int, w io.Writer) (*LineWriter, error) {
 // Number of lines should > 0.
 // 	Note: This is a buffer method.
 func NewWithStdout(lines int) (*LineWriter, error) {
-	if !isTty() {
+	if !isTerminal() {
 		return nil, errFunc("not a terminal!")
 	}
 	return New(lines, os.Stdout)
@@ -225,8 +226,10 @@ func errFunc(s string) error {
 	return errors.New(errPrefix + s)
 }
 
-func isTty() bool {
-	if fileInfo, _ := os.Stdout.Stat(); (fileInfo.Mode() & os.ModeCharDevice) != 0 {
+func isTerminal() bool {
+	if isatty.IsTerminal(os.Stdout.Fd()) {
+		return true
+	} else if isatty.IsCygwinTerminal(os.Stdout.Fd()) {
 		return true
 	} else {
 		return false
