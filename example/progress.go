@@ -12,7 +12,7 @@ func main() {
 	names := []string{"cat", "dog"}
 	var wg sync.WaitGroup
 
-	lw, err := writeline.NewWithStdout(len(names) * 2)
+	lw, err := writeline.New(len(names) * 2)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func main() {
 	go func() {
 		for i := 0; i < 100; i++ {
 
-			lw.WriteLine(2, fmt.Sprintf("%v, %vth loop", names[1], i))
+			lw.WriteLine(2, writeline.Style(writeline.Green+writeline.Bold, fmt.Sprintf("%v, %vth loop", names[1], i))+"test")
 			lw.WriteLine(2+1, fmt.Sprintf("%v...%v/%v", names[1], i+1, 100))
 			time.Sleep(50 * time.Millisecond)
 		}

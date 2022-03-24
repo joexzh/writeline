@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mattn/go-isatty"
-	"io"
 	"os"
 	"sync"
 	"time"
@@ -18,41 +17,37 @@ type LineWriter struct {
 	stop     chan struct{}
 	lines    int
 	currLine int // from top to down, begin at zero
-	wr       *bufio.Writer
+	W        *bufio.Writer
 	duration time.Duration
 	mu       sync.Mutex
 }
 
-// New creates a *LineWriter for io.Writer, inits and maintains n lines. Also starts a flush timer with default duration of 200*time.Millisecond.
+// New creates a *LineWriter for os.Stdout, inits and maintains n lines. Also starts a flush timer with default duration of 200*time.Millisecond.
 // Number of lines should > 0.
+//
+// LineWriter.Close should be used after finished.
 // 	Note: This is a buffer method.
-func New(lines int, w io.Writer) (*LineWriter, error) {
+func New(lines int) (*LineWriter, error) {
+	if !isTerminal() {
+		return nil, errFunc("not a terminal!")
+	}
+
 	if lines < 1 {
 		return nil, errFunc("lines should > 0")
 	}
-	wl := &LineWriter{
-		wr:       bufio.NewWriter(w),
+	lw := &LineWriter{
+		W:        bufio.NewWriter(os.Stdout),
 		lines:    lines,
 		stop:     make(chan struct{}),
 		duration: 200 * time.Millisecond,
 	}
 
-	go wl.startTimer()
-	err := wl.initLines()
+	go lw.startTimer()
+	err := lw.initLines()
 	if err != nil {
 		return nil, errFunc(err.Error())
 	}
-	return wl, nil
-}
-
-// NewWithStdout creates a *LineWriter for os.Stdout, inits and maintains n lines. Also starts a flush timer with default duration of 200*time.Millisecond.
-// Number of lines should > 0.
-// 	Note: This is a buffer method.
-func NewWithStdout(lines int) (*LineWriter, error) {
-	if !isTerminal() {
-		return nil, errFunc("not a terminal!")
-	}
-	return New(lines, os.Stdout)
+	return lw, nil
 }
 
 func (w *LineWriter) SetFlushDuration(d time.Duration) {
@@ -73,7 +68,7 @@ func (w *LineWriter) WriteNewLine(s string) (int, error) {
 	if err := w.newLine(); err != nil {
 		return 0, errFunc(err.Error())
 	}
-	_, err := w.wr.WriteString(s)
+	_, err := w.W.WriteString(s)
 	if err != nil {
 		return 0, errFunc(err.Error())
 	}
@@ -115,7 +110,7 @@ func (w *LineWriter) Lines() int {
 func (w *LineWriter) Flush() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if err := w.wr.Flush(); err != nil {
+	if err := w.W.Flush(); err != nil {
 		return errFunc(err.Error())
 	}
 	return nil
@@ -124,14 +119,16 @@ func (w *LineWriter) Flush() error {
 // Close end with a newline, stop timer, flush all remaining buffered string
 func (w *LineWriter) Close() error {
 	w.mu.Lock()
-	defer w.mu.Unlock()
-	defer w.wr.Flush()
-	defer close(w.stop)
+	defer func() {
+		defer close(w.stop)
+		defer w.W.Flush()
+		defer w.mu.Unlock()
+	}()
 
 	if err := w.moveCursorToLine(w.lines - 1); err != nil {
 		return errFunc(err.Error())
 	}
-	_, err := w.wr.WriteString("\n\r")
+	_, err := w.W.WriteString("\n\r")
 	if err != nil {
 		return errFunc(err.Error())
 	}
@@ -166,7 +163,7 @@ func (w *LineWriter) moveCursorToLine(n int) error {
 
 func (w *LineWriter) initLines() error {
 	for i := 0; i < w.lines-1; i++ {
-		_, err := w.wr.WriteString("\n")
+		_, err := w.W.WriteString("\n")
 		if err != nil {
 			return err
 		}
@@ -176,7 +173,7 @@ func (w *LineWriter) initLines() error {
 }
 
 func (w *LineWriter) moveUpLines(n int) error {
-	_, err := w.wr.WriteString(fmt.Sprintf(moveUpLines, n))
+	_, err := w.W.WriteString(fmt.Sprintf(moveUpLines, n))
 	if err != nil {
 		return err
 	}
@@ -185,7 +182,7 @@ func (w *LineWriter) moveUpLines(n int) error {
 }
 
 func (w *LineWriter) moveDownLines(n int) error {
-	_, err := w.wr.WriteString(fmt.Sprintf(moveDownLines, n))
+	_, err := w.W.WriteString(fmt.Sprintf(moveDownLines, n))
 	if err != nil {
 		return err
 	}
@@ -194,7 +191,7 @@ func (w *LineWriter) moveDownLines(n int) error {
 }
 
 func (w *LineWriter) eraseLine() error {
-	_, err := w.wr.WriteString(carriageReturn + eraseToEnd)
+	_, err := w.W.WriteString(carriageReturn + eraseToEnd)
 	return err
 }
 
@@ -205,7 +202,7 @@ func (w *LineWriter) writeLine(n int, s string) error {
 	if err := w.eraseLine(); err != nil {
 		return err
 	}
-	_, err := w.wr.WriteString(s)
+	_, err := w.W.WriteString(s)
 	return err
 }
 
@@ -213,7 +210,7 @@ func (w *LineWriter) newLine() error {
 	if err := w.moveCursorToLine(w.lines - 1); err != nil {
 		return err
 	}
-	_, err := w.wr.WriteString("\n\r")
+	_, err := w.W.WriteString("\n\r")
 	if err != nil {
 		return err
 	}

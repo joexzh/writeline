@@ -4,35 +4,42 @@ Simple Go lib for overwrite stdout lines.
 It maintains new lines and overwrites to them.
 
 ## methods:
+
+
 ```go
-// new writeline creates and maintains 10 new lines.
-// It holds a default flush timer with 200 milliseconds duration   
-lw, err := NewWithStdout(10)
+import "github.com/joexzh/writeline"
 
-// reset the flush timer duration
-lw.SetFlushDuration(100 * time.Millisecond)
+func main() {
+    // new writeline creates and maintains 10 new lines.
+    // It holds a default flush timer with 200 milliseconds duration   
+    lw, err := writeline.New(10)
+    
+    // reset the flush timer duration
+    lw.SetFlushDuration(100 * time.Millisecond)
+    
+    // Flush all changes immediately
+    lw.Flush()
+    
+    // overwrite line 0
+    lw.WriteLine(0, writeline.Style(writeline.Bold+writeline.Green, "hi"))
+    
+    // overwrite line 9
+    lw.WriteLine(9, "Hello world")
+    lw.Flush()
+    
+    // overwrite the last line
+    lineNum, err := lw.WriteLastLine("hi")
+    
+    // create a new line at the bottom and write to it
+    newLineNum, err := lw.WriteNewLine("foo")
+    
+    // total maintained lines
+    lw.Lines() // 11
+    
+    // close writeline
+    lw.Close()
+}
 
-// Flush all changes immediately
-lw.Flush()
-
-// overwrite line 0
-lw.WriteLine(0, "Hello world")
-
-// overwrite line 9
-lw.WriteLine(9, "Hello world")
-lw.Flush()
-
-// overwrite the last line
-lineNum, err := lw.WriteLastLine("hi")
-
-// create a new line at the bottom and write to it
-newLineNum, err := lw.WriteNewLine("foo")
-
-// total maintained lines
-lw.Lines() // 11
-
-// close writeline
-wl.Close()
 ```
 
 ## Caution
